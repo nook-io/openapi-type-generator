@@ -1,0 +1,19 @@
+{
+  "name": "generate-api-types",
+  "version": "1.0.0",
+  "description": "",
+  "main": "generate-api-types.js",
+  "scripts": {},
+  "author": "Johnny Deuss",
+  "license": "UNLICENSED",
+  "dependencies": {
+    "@typescript-eslint/parser": "^6.7.0",
+    "axios": "^1.5.0",
+    "handlebars": "^4.7.8",
+    "openapi-typescript": "^6.6.1"
+  },
+  "type": "module",
+  "bin": {
+    "generate-api-types": "./generate-api-types.js"
+  }
+}
