@@ -1,0 +1,9 @@
+- id: openapi-type-generator
+  name: openapi-type-generator
+  entry: generate-api-types
+  language: node
+  args: []
+  types: []
+  require_serial: false
+  additional_dependencies: []
+  minimum_pre_commit_version: '0'
