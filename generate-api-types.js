@@ -1,18 +1,39 @@
-import axios from 'axios';
+import { parseArgs } from "node:util";
 import fs from 'fs';
+import path from 'path';
+
+
+import axios from 'axios';
 import openapiTS from 'openapi-typescript';
 import parser from '@typescript-eslint/parser';
 import Handlebars from "handlebars";
 
+const {values} = parseArgs({
+  options: {
+    'types-dir': {
+      type: "string",
+      default: "src/types",
+    },
+    'openapi-url': {
+      type: "string",
+      default: "http://localhost:8000/openapi.json",
+    },
+  },
+});
+
+const typesDir = values['types-dir'];
+const openapiUrl = values['openapi-url'];
+
 let response;
 try {
-  response = await axios.get('http://localhost:8000/openapi.json');
+  response = await axios.get(openapiUrl);
 } catch (e) {
   console.log("Can't download openapi.json from localhost:8000. Please start the backend and try again.");
   return
 }
 const typeFile = await openapiTS(response.data);
-fs.writeFileSync('../../src/types/openapi.generated.d.ts', typeFile);
+const openapiGeneratePath = path.join(typesDir, 'openapi.generated.d.ts');
+fs.writeFileSync(openapiGeneratePath, typeFile);
 const output = parser.parse(typeFile);
 
 const componentsNode = output.body.find(node => node.type === 'ExportNamedDeclaration' && node.declaration.id.name === 'components');
@@ -29,4 +50,5 @@ export type {{this}} = components["schemas"]["{{this}}"];
 {{/each}}
 `);
 const dataTypesFile = template({schemas: schemaNames});
-fs.writeFileSync('../../src/types/schemas.d.ts', dataTypesFile);
+const schemasPath = path.join(typesDir, 'schemas.d.ts');
+fs.writeFileSync(schemasPath, dataTypesFile);
