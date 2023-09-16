@@ -167,3 +167,4 @@ fs.writeFileSync(openAPIGeneratedPath, typeFile);
 const reExporterFile = generateReExporterFile(typeFile, args['types-dir'], enumLookup);
 const schemasPath = path.join(args['project-root'], args['types-dir'], 'schemas.d.ts');
 fs.writeFileSync(schemasPath, reExporterFile);
+execSync(`git add ${openAPIGeneratedPath} ${schemasPath}`, {stdio: 'inherit'}); 
