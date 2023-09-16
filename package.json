@@ -1,5 +1,5 @@
 {
-  "name": "generate-api-types",
+  "name": "openapi-type-generator",
   "version": "1.0.0",
   "description": "",
   "main": "generate-api-types.js",
@@ -8,7 +8,6 @@
   "license": "UNLICENSED",
   "dependencies": {
     "@typescript-eslint/parser": "^6.7.0",
-    "axios": "^1.5.0",
     "handlebars": "^4.7.8",
     "openapi-typescript": "^6.6.1"
   },
