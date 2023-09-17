@@ -66,9 +66,16 @@ async function loadOpenAPISchema(args, importOrder) {
       case 'oas-command':
         openAPIFile =  execSync(args['oas-command']);
         return JSON.parse(openAPIFile);
-      case 'oas-url':
-        const response = await fetch(args['oas-url']);
+      case 'oas-url': {
+        let response;
+        try {
+          response = await fetch(args['oas-url']);
+        }
+        catch (e) {
+          continue;
+        }
         return await response.json();
+      }
     }
   }
   throw new Error('Could not load OpenAPI file');
