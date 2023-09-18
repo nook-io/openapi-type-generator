@@ -69,31 +69,32 @@ function getArgs() {
 async function loadOpenAPISchema(args, importOrder) {
   let openAPIFile;
   for (const importKey of importOrder) {
-    switch (importKey) {
-      case 'oas-path':
-        openAPIFile = fs.readFileSync(args['oas-path']);
-        return JSON.parse(openAPIFile);
-      case 'oas-command': {
-        const options = {stdio: 'inherit'};
-        if (args['command-cwd']) {
-          options.cwd = args['command-cwd'];
+    try {
+      switch (importKey) {
+        case 'oas-path':
+          openAPIFile = fs.readFileSync(args['oas-path']);
+          return JSON.parse(openAPIFile);
+        case 'oas-command': {
+          const options = {stdio: 'inherit'};
+          if (args['command-cwd']) {
+            options.cwd = args['command-cwd'];
+          }
+          openAPIFile = execSync(args['oas-command'], options);
+          return JSON.parse(openAPIFile);
         }
-        openAPIFile = execSync(args['oas-command'], options);
-        return JSON.parse(openAPIFile);
-      }
-      case 'oas-url': {
-        let response;
-        try {
-          response = await fetch(args['oas-url']);
+        case 'oas-url': {
+          let response;
+            response = await fetch(args['oas-url']);
+          return await response.json();
         }
-        catch (e) {
-          continue;
-        }
-        return await response.json();
       }
     }
+    catch (e) {
+      continue;
+    }
   }
-  throw new Error('Could not load OpenAPI file');
+  console.log('Could not load OpenAPI file');
+  process.exit(0)
 }
 
 /**

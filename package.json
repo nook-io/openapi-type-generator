@@ -1,6 +1,6 @@
 {
   "name": "openapi-type-generator",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "",
   "main": "generate-api-types.js",
   "scripts": {},
