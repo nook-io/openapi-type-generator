@@ -3,15 +3,15 @@ import { parseArgs } from "node:util";
 import fs from 'fs';
 import path from 'path';
 import { execSync } from 'child_process';
-import parser from '@typescript-eslint/parser';
 
+import parser from '@typescript-eslint/parser';
 import openapiTS from 'openapi-typescript';
 
 
 function getArgs() {
   const {values: args, tokens} = parseArgs({
     options: {
-      // The import root of the project.
+      // The import root of the JS project.
       'project-root': {
         type: 'string',
         default: './src/',
@@ -36,12 +36,22 @@ function getArgs() {
         type: "string",
         default: ""
       },
+      // The working directory to run the command in.
+      'command-cwd': {
+        type: "string",
+        default: ""
+      }
     },
     tokens: true
   });
 
   if (!args['oas-url'] && !args['oas-path'] && !args['oas-command']) {
     console.log('Must provide either --oas-url, --oas-path or --oas-command');
+    process.exit(0);
+  }
+
+  if (args['command-cwd'] && !args['oas-command']) {
+    console.log('Must provide --oas-command if --command-cwd is provided');
     process.exit(0);
   }
 
@@ -63,9 +73,14 @@ async function loadOpenAPISchema(args, importOrder) {
       case 'oas-path':
         openAPIFile = fs.readFileSync(args['oas-path']);
         return JSON.parse(openAPIFile);
-      case 'oas-command':
-        openAPIFile =  execSync(args['oas-command']);
+      case 'oas-command': {
+        const options = {stdio: 'inherit'};
+        if (args['command-cwd']) {
+          options.cwd = args['command-cwd'];
+        }
+        openAPIFile = execSync(args['oas-command'], options);
         return JSON.parse(openAPIFile);
+      }
       case 'oas-url': {
         let response;
         try {
