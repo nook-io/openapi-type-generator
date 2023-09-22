@@ -5,8 +5,12 @@ import path from 'path';
 import { execSync } from 'child_process';
 
 import parser from '@typescript-eslint/parser';
+import hash from 'object-hash';
 import openapiTS from 'openapi-typescript';
 
+function isOptionToken(token) {
+  return token.kind === 'option';
+}
 
 function getArgs() {
   const {values: args, tokens} = parseArgs({
@@ -56,9 +60,10 @@ function getArgs() {
   }
 
   const importOrder = tokens
+    .filter(isOptionToken)
     .filter(token => token.name.startsWith('oas'))
     .sort((a, b) => a.index - b.index)
-    .map(token => token.name);;
+    .map(token => token.name);
 
   return {args, importOrder};
 }
@@ -143,6 +148,19 @@ function transform(schemaObject, metadata) {
 }
 
 /**
+ * Get the schemas hash specified in the given OpenAPI type file, if any.
+ */
+function getSchemaHash(openAPITypesPath) {
+  const openAPIFile = fs.readFileSync(openAPITypesPath);
+  const output = parser.parse(openAPIFile);
+  const schemaHashNodes = output.body.filter(node => node.type === 'ExportNamedDeclaration' && node.declaration.kind === 'const' && node.declaration.declarations[0].id.name == 'schemaHash');
+  if (schemaHashNodes.length === 0) {
+    return null;
+  }
+  return schemaHashNodes[0].declaration.declarations[0].init.value;
+}
+
+/**
  * Generate a re-exporter file for the generated types. This file
  * imports the components file from the generated OpenAPI types file
  * and re-exports all the schemas from it, as well as re-exporting all
@@ -179,6 +197,13 @@ function generateReExporterFile(typeFile, typesDir, enumLookup) {
 
 const {args, importOrder} = getArgs();
 const openAPISchema = await loadOpenAPISchema(args, importOrder);
+const schemaHash = hash(openAPISchema);
+const openAPIGeneratedPath = path.join(args['project-root'], args['types-dir'], 'openapi.d.ts');
+const prevSchemaHash = getSchemaHash(openAPIGeneratedPath)
+if (prevSchemaHash === schemaHash) {
+  console.log("OpenAPI file has not changed, skipping generation.");
+  process.exit(0);
+}
 const enumLookup = {};
 
 let typeFile;
@@ -188,11 +213,17 @@ try {
   console.log(e);
   process.exit(0);
 }
+typeFile += `\nexport const schemaHash = '${schemaHash}';\n`;
+// Add enum definitions to the generated types file.
 const enumDefs = Object.values(enumLookup).map((enumSchema) => formatEnum(enumSchema)).join('\n');
 typeFile += '\n' + enumDefs + '\n';
-const openAPIGeneratedPath = path.join(args['project-root'], args['types-dir'], 'openapi.d.ts');
+
 fs.writeFileSync(openAPIGeneratedPath, typeFile);
 const reExporterFile = generateReExporterFile(typeFile, args['types-dir'], enumLookup);
 const schemasPath = path.join(args['project-root'], args['types-dir'], 'schemas.d.ts');
 fs.writeFileSync(schemasPath, reExporterFile);
-execSync(`git add ${openAPIGeneratedPath} ${schemasPath}`, {stdio: 'inherit'}); 
+try {
+  execSync(`git add ${openAPIGeneratedPath} ${schemasPath}`, {stdio: 'inherit'}); 
+} catch (e) {
+  // We're non inside the Git repo, so we can't add the files.
+}
