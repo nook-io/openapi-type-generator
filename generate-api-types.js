@@ -83,8 +83,13 @@ async function loadOpenAPISchema(args, importOrder) {
           return JSON.parse(openAPIFile);
         }
         case 'oas-url': {
+          const controller = new AbortController()
+          const timeout = setTimeout(() => {
+            controller.abort()
+          }, 5000)
           let response;
-            response = await fetch(args['oas-url']);
+          response = await fetch(args['oas-url'], {signal: controller.signal});
+          clearTimeout(timeout)
           return await response.json();
         }
       }
@@ -166,7 +171,7 @@ function generateReExporterFile(typeFile, typesDir, enumLookup) {
   reExporterLines = reExporterLines.concat(schemaProperties.filter(schemaProperty => !(schemaProperty.key.name in enumLookup)).map(schemaProperty => {
     const schemaName = schemaProperty.key.name;
     const isEnum = schemaProperty.key.type === 'Identifier' && schemaName in enumLookup;
-    return `export ${isEnum ? "const" : "type"} ${schemaName} = components['schemas']['${schemaName}}'];`;
+    return `export ${isEnum ? "const" : "type"} ${schemaName} = components['schemas']['${schemaName}'];`;
   }));
   reExporterLines.push('');
   return reExporterLines.join('\n');
