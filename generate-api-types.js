@@ -44,6 +44,13 @@ function getArgs() {
       'command-cwd': {
         type: "string",
         default: ""
+      },
+      // Automatically add the changed files after generation. These
+      // changed files may not be picked up by subsequent pre-commit
+      // hooks.
+      'auto-add': {
+        type: "boolean",
+        default: false
       }
     },
     tokens: true
@@ -222,8 +229,10 @@ fs.writeFileSync(openAPIGeneratedPath, typeFile);
 const reExporterFile = generateReExporterFile(typeFile, args['types-dir'], enumLookup);
 const schemasPath = path.join(args['project-root'], args['types-dir'], 'schemas.d.ts');
 fs.writeFileSync(schemasPath, reExporterFile);
-try {
-  execSync(`git add ${openAPIGeneratedPath} ${schemasPath}`, {stdio: 'inherit'}); 
-} catch (e) {
-  // We're non inside the Git repo, so we can't add the files.
+if (args['auto-add']) {
+  try {
+    execSync(`git add ${openAPIGeneratedPath} ${schemasPath}`, {stdio: 'inherit'}); 
+  } catch (e) {
+    // We're non inside the Git repo, so we can't add the files.
+  }
 }
