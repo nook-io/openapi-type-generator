@@ -3,6 +3,7 @@ import { parseArgs } from "node:util";
 import fs from 'fs';
 import path from 'path';
 import { execSync } from 'child_process';
+import pkg from './package.json' assert { type: "json" };
 
 import parser from '@typescript-eslint/parser';
 import hash from 'object-hash';
@@ -204,7 +205,7 @@ function generateReExporterFile(typeFile, typesDir, enumLookup) {
 
 const {args, importOrder} = getArgs();
 const openAPISchema = await loadOpenAPISchema(args, importOrder);
-const schemaHash = hash(openAPISchema);
+const schemaHash = hash({...openAPISchema, typeGeneratorVersion: pkg.version});
 const openAPIGeneratedPath = path.join(args['project-root'], args['types-dir'], 'openapi.d.ts');
 const prevSchemaHash = getSchemaHash(openAPIGeneratedPath)
 if (prevSchemaHash === schemaHash) {
