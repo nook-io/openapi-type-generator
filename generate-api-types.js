@@ -127,7 +127,7 @@ function formatEnum(enumSchema) {
     .join(',\n');
   return `\
 ${commentString}\
-enum ${enumName.replace(/[^\w\d]/, '')} {
+export enum ${enumName.replace(/[^\w\d]/, '')} {
 ${enumValues}
 }`;
 }
@@ -139,6 +139,9 @@ ${enumValues}
  */
 function transform(schemaObject, metadata) {
   if (!('enum' in schemaObject)) {
+    return '';
+  }
+  if (schemaObject.type !== 'string') {
     return '';
   }
   const enumName = schemaObject.title;
@@ -206,7 +209,7 @@ function generateReExporterFile(typeFile, typesDir, enumLookup) {
 const {args, importOrder} = getArgs();
 const openAPISchema = await loadOpenAPISchema(args, importOrder);
 const schemaHash = hash({...openAPISchema, typeGeneratorVersion: pkg.version});
-const openAPIGeneratedPath = path.join(args['project-root'], args['types-dir'], 'openapi.d.ts');
+const openAPIGeneratedPath = path.join(args['project-root'], args['types-dir'], 'openapi.ts');
 const prevSchemaHash = getSchemaHash(openAPIGeneratedPath)
 if (prevSchemaHash === schemaHash) {
   console.log("OpenAPI file has not changed, skipping generation.");
@@ -228,7 +231,7 @@ typeFile += '\n' + enumDefs + '\n';
 
 fs.writeFileSync(openAPIGeneratedPath, typeFile);
 const reExporterFile = generateReExporterFile(typeFile, args['types-dir'], enumLookup);
-const schemasPath = path.join(args['project-root'], args['types-dir'], 'schemas.d.ts');
+const schemasPath = path.join(args['project-root'], args['types-dir'], 'schemas.ts');
 fs.writeFileSync(schemasPath, reExporterFile);
 if (args['auto-add']) {
   try {
