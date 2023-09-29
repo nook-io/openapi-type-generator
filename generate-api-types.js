@@ -94,7 +94,7 @@ async function loadOpenAPISchema(args, importOrder) {
             options.cwd = args['command-cwd'];
           }
 
-          const openAPIFile = execSync(args['oas-command'], options);
+          openAPIFile = execSync(args['oas-command'], options);
           return JSON.parse(openAPIFile);
         }
         case 'oas-url': {
