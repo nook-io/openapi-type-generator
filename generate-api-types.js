@@ -108,6 +108,7 @@ async function loadOpenAPISchema(args, importOrder) {
       }
     }
     catch (e) {
+      console.log(`Could not load OpenAPI file using ${importKey}: ${e}`);
       continue;
     }
   }
