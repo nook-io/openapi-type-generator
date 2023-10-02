@@ -163,7 +163,12 @@ function transform(schemaObject, metadata) {
  * Get the schemas hash specified in the given OpenAPI type file, if any.
  */
 function getSchemaHash(openAPITypesPath) {
-  const openAPIFile = fs.readFileSync(openAPITypesPath);
+  let openAPIFile;
+  try {
+    openAPIFile = fs.readFileSync(openAPITypesPath);
+  } catch (e) {
+    return null;
+  }
   const output = parser.parse(openAPIFile);
   const schemaHashNodes = output.body.filter(node => node.type === 'ExportNamedDeclaration' && node.declaration.kind === 'const' && node.declaration.declarations[0].id.name == 'schemaHash');
   if (schemaHashNodes.length === 0) {
@@ -212,7 +217,7 @@ const openAPISchema = await loadOpenAPISchema(args, importOrder);
 const schemaHash = hash({...openAPISchema, typeGeneratorVersion: pkg.version});
 const openAPIGeneratedPath = path.join(args['project-root'], args['types-dir'], 'openapi.ts');
 const prevSchemaHash = getSchemaHash(openAPIGeneratedPath)
-if (prevSchemaHash === schemaHash) {
+if (prevSchemaHash != null && prevSchemaHash === schemaHash) {
   console.log("OpenAPI file has not changed, skipping generation.");
   process.exit(0);
 }
@@ -238,6 +243,6 @@ if (args['auto-add']) {
   try {
     execSync(`git add ${openAPIGeneratedPath} ${schemasPath}`, { stdio: 'inherit' }); 
   } catch (e) {
-    // We're non inside the Git repo, so we can't add the files.
+    // We're not inside the Git repo, so we can't add the files.
   }
 }
