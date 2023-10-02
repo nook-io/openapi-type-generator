@@ -14,7 +14,7 @@ function isOptionToken(token) {
 }
 
 function getArgs() {
-  const {values: args, tokens} = parseArgs({
+  const { values: args, tokens } = parseArgs({
     options: {
       // The import root of the JS project.
       'project-root': {
@@ -73,7 +73,7 @@ function getArgs() {
     .sort((a, b) => a.index - b.index)
     .map(token => token.name);
 
-  return {args, importOrder};
+  return { args, importOrder };
 }
 
 /**
@@ -88,7 +88,7 @@ async function loadOpenAPISchema(args, importOrder) {
           openAPIFile = fs.readFileSync(args['oas-path']);
           return JSON.parse(openAPIFile);
         case 'oas-command': {
-          const options = {stdio: 'inherit'};
+          const options = {};
           if (args['command-cwd']) {
             options.cwd = args['command-cwd'];
           }
@@ -101,7 +101,7 @@ async function loadOpenAPISchema(args, importOrder) {
             controller.abort()
           }, 5000)
           let response;
-          response = await fetch(args['oas-url'], {signal: controller.signal});
+          response = await fetch(args['oas-url'], { signal: controller.signal });
           clearTimeout(timeout)
           return await response.json();
         }
@@ -206,7 +206,7 @@ function generateReExporterFile(typeFile, typesDir, enumLookup) {
   return reExporterLines.join('\n');
 }
 
-const {args, importOrder} = getArgs();
+const { args, importOrder } = getArgs();
 const openAPISchema = await loadOpenAPISchema(args, importOrder);
 const schemaHash = hash({...openAPISchema, typeGeneratorVersion: pkg.version});
 const openAPIGeneratedPath = path.join(args['project-root'], args['types-dir'], 'openapi.ts');
@@ -219,7 +219,7 @@ const enumLookup = {};
 
 let typeFile;
 try {
-  typeFile = await openapiTS(openAPISchema, {transform});
+  typeFile = await openapiTS(openAPISchema, { transform });
 } catch (e) {
   console.log(e);
   process.exit(0);
@@ -235,7 +235,7 @@ const schemasPath = path.join(args['project-root'], args['types-dir'], 'schemas.
 fs.writeFileSync(schemasPath, reExporterFile);
 if (args['auto-add']) {
   try {
-    execSync(`git add ${openAPIGeneratedPath} ${schemasPath}`, {stdio: 'inherit'}); 
+    execSync(`git add ${openAPIGeneratedPath} ${schemasPath}`, { stdio: 'inherit' }); 
   } catch (e) {
     // We're non inside the Git repo, so we can't add the files.
   }
