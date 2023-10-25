@@ -1,6 +1,6 @@
 {
   "name": "openapi-type-generator",
-  "version": "1.0.7",
+  "version": "1.0.8",
   "description": "",
   "main": "generate-api-types.js",
   "scripts": {},
@@ -8,7 +8,6 @@
   "license": "UNLICENSED",
   "dependencies": {
     "@typescript-eslint/parser": "^6.7.0",
-    "object-hash": "^3.0.0",
     "openapi-typescript": "^6.6.1"
   },
   "type": "module",

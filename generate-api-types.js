@@ -3,10 +3,8 @@ import { parseArgs } from "node:util";
 import fs from 'fs';
 import path from 'path';
 import { execSync } from 'child_process';
-import pkg from './package.json' assert { type: "json" };
 
 import parser from '@typescript-eslint/parser';
-import hash from 'object-hash';
 import openapiTS from 'openapi-typescript';
 
 function isOptionToken(token) {
@@ -160,24 +158,6 @@ function transform(schemaObject, metadata) {
 }
 
 /**
- * Get the schemas hash specified in the given OpenAPI type file, if any.
- */
-function getSchemaHash(openAPITypesPath) {
-  let openAPIFile;
-  try {
-    openAPIFile = fs.readFileSync(openAPITypesPath);
-  } catch (e) {
-    return null;
-  }
-  const output = parser.parse(openAPIFile);
-  const schemaHashNodes = output.body.filter(node => node.type === 'ExportNamedDeclaration' && node.declaration.kind === 'const' && node.declaration.declarations[0].id.name == 'schemaHash');
-  if (schemaHashNodes.length === 0) {
-    return null;
-  }
-  return schemaHashNodes[0].declaration.declarations[0].init.value;
-}
-
-/**
  * Generate a re-exporter file for the generated types. This file
  * imports the components file from the generated OpenAPI types file
  * and re-exports all the schemas from it, as well as re-exporting all
@@ -214,13 +194,7 @@ function generateReExporterFile(typeFile, typesDir, enumLookup) {
 
 const { args, importOrder } = getArgs();
 const openAPISchema = await loadOpenAPISchema(args, importOrder);
-const schemaHash = hash({...openAPISchema, typeGeneratorVersion: pkg.version});
 const openAPIGeneratedPath = path.join(args['project-root'], args['types-dir'], 'openapi.ts');
-const prevSchemaHash = getSchemaHash(openAPIGeneratedPath)
-if (prevSchemaHash != null && prevSchemaHash === schemaHash) {
-  console.log("OpenAPI file has not changed, skipping generation.");
-  process.exit(0);
-}
 const enumLookup = {};
 
 let typeFile;
@@ -230,7 +204,6 @@ try {
   console.log(e);
   process.exit(0);
 }
-typeFile += `\nexport const schemaHash = '${schemaHash}';\n`;
 // Add enum definitions to the generated types file.
 const enumDefs = Object.values(enumLookup).map((enumSchema) => formatEnum(enumSchema)).join('\n');
 typeFile += '\n' + enumDefs + '\n';
