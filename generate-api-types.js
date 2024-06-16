@@ -184,9 +184,10 @@ function generateReExporterFile(typeFile, typesDir, enumLookup) {
   reExporterLines.push('');
 
   reExporterLines = reExporterLines.concat(schemaProperties.filter(schemaProperty => !(schemaProperty.key.name in enumLookup)).map(schemaProperty => {
-    const schemaName = schemaProperty.key.name;
+    const schemaName = schemaProperty.key.name || schemaProperty.key.value;
+    const cleanSchemaName = schemaName.replace(/([^\w\d])|(^[^a-zA-Z]+)/g, '');
     const isEnum = schemaProperty.key.type === 'Identifier' && schemaName in enumLookup;
-    return `export ${isEnum ? "const" : "type"} ${schemaName} = components['schemas']['${schemaName}'];`;
+    return `export ${isEnum ? "const" : "type"} ${cleanSchemaName} = components['schemas']['${schemaName}'];`;
   }));
   reExporterLines.push('');
   return reExporterLines.join('\n');
