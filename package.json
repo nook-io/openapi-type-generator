@@ -1,14 +1,15 @@
 {
   "name": "openapi-type-generator",
-  "version": "1.0.9",
+  "version": "1.0.10",
   "description": "",
   "main": "generate-api-types.js",
   "scripts": {},
   "author": "Johnny Deuss",
   "license": "UNLICENSED",
   "dependencies": {
-    "@typescript-eslint/parser": "^7.13.0",
-    "openapi-typescript": "^6.7.6"
+    "@typescript-eslint/parser": "^7.14.1",
+    "openapi-typescript": "^7.0.0",
+    "typescript": "^5.5.2"
   },
   "type": "module",
   "bin": {

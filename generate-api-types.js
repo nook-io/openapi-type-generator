@@ -5,7 +5,8 @@ import path from 'path';
 import { execSync } from 'child_process';
 
 import parser from '@typescript-eslint/parser';
-import openapiTS from 'openapi-typescript';
+import openapiTS, { astToString } from 'openapi-typescript';
+import ts from "typescript";
 
 function isOptionToken(token) {
   return token.kind === 'option';
@@ -50,6 +51,12 @@ function getArgs() {
       'auto-add': {
         type: "boolean",
         default: false
+      },
+      // Number of milliseconds to wait for the OpenAPI file to be
+      // fetched before timing out. 
+      'timeout': {
+        type: 'string',
+        default: '30000'
       }
     },
     tokens: true
@@ -70,7 +77,7 @@ function getArgs() {
     .filter(token => token.name.startsWith('oas'))
     .sort((a, b) => a.index - b.index)
     .map(token => token.name);
-
+  args['timeout'] = Number(args['timeout']);
   return { args, importOrder };
 }
 
@@ -97,7 +104,7 @@ async function loadOpenAPISchema(args, importOrder) {
           const controller = new AbortController()
           const timeout = setTimeout(() => {
             controller.abort()
-          }, 5000)
+          }, args['timeout'])
           let response;
           response = await fetch(args['oas-url'], { signal: controller.signal });
           clearTimeout(timeout)
@@ -114,48 +121,6 @@ async function loadOpenAPISchema(args, importOrder) {
   process.exit(0)
 }
 
-/**
- * Convert an enum schema into a string representation of a
- * TypeScript enum.
- */
-function formatEnum(enumSchema) {
-  const enumName = enumSchema.title;
-  const commentString = enumSchema.description ? `/**\n * ${enumSchema.description}\n */\n` : '';
-  const enumValues = enumSchema.enum
-    .map((value) => `  ${JSON.stringify(value)} = ${JSON.stringify(value)}`)
-    .join(',\n');
-  return `\
-${commentString}\
-export enum ${enumName.replace(/[^\w\d]/, '')} {
-${enumValues}
-}`;
-}
-
-/**
- * Transform union enums into a single enum when they have their own
- * schema, i.e. are referenced through a $ref, not inlined. Used with
- * openapiTS.
- */
-function transform(schemaObject, metadata) {
-  if (!('enum' in schemaObject)) {
-    return '';
-  }
-  if (schemaObject.type !== 'string') {
-    return '';
-  }
-  const enumName = schemaObject.title;
-  if (!enumName) {
-    return '';
-  }
-  const schemaName = metadata.path.split('/').at(-1);
-  if (schemaName !== enumName) {
-    return '';
-  }
-  if (!enumLookup[enumName]) {
-    enumLookup[enumName] = schemaObject;
-  }
-  return enumName;
-}
 
 /**
  * Generate a re-exporter file for the generated types. This file
@@ -165,7 +130,7 @@ function transform(schemaObject, metadata) {
  * you can use a type like `const x: MySchema` instead of
  * `const x: components['schemas']['MySchema']`.
  */
-function generateReExporterFile(typeFile, typesDir, enumLookup) {
+function generateReExporterFile(typeFile, typesDir, enumNames) {
   const output = parser.parse(typeFile);
   const componentsNode = output.body.find(node => node.type === 'ExportNamedDeclaration' && node.declaration.id.name === 'components');
   const componentProperties = componentsNode.declaration.body.body
@@ -174,19 +139,19 @@ function generateReExporterFile(typeFile, typesDir, enumLookup) {
   const openAPIPath = path.join(typesDir, 'openapi');
   
   let reExporterLines = [`import { components } from '${openAPIPath}';\n`];
-  if (Object.keys(enumLookup).length > 0) {
+  if (enumNames.size > 0) {
     reExporterLines.push('export {');
-    for (const enumName in enumLookup) {
+    for (const enumName of enumNames) {
       reExporterLines.push(`  ${enumName},`);
     }
     reExporterLines.push(`} from '${openAPIPath}';`);
   }
   reExporterLines.push('');
 
-  reExporterLines = reExporterLines.concat(schemaProperties.filter(schemaProperty => !(schemaProperty.key.name in enumLookup)).map(schemaProperty => {
+  reExporterLines = reExporterLines.concat(schemaProperties.filter(schemaProperty => !enumNames.has(schemaProperty.key.name)).map(schemaProperty => {
     const schemaName = schemaProperty.key.name || schemaProperty.key.value;
     const cleanSchemaName = schemaName.replace(/([^\w\d])|(^[^a-zA-Z]+)/g, '');
-    const isEnum = schemaProperty.key.type === 'Identifier' && schemaName in enumLookup;
+    const isEnum = schemaProperty.key.type === 'Identifier' && enumNames.has(schemaName);
     return `export ${isEnum ? "const" : "type"} ${cleanSchemaName} = components['schemas']['${schemaName}'];`;
   }));
   reExporterLines.push('');
@@ -196,21 +161,18 @@ function generateReExporterFile(typeFile, typesDir, enumLookup) {
 const { args, importOrder } = getArgs();
 const openAPISchema = await loadOpenAPISchema(args, importOrder);
 const openAPIGeneratedPath = path.join(args['project-root'], args['types-dir'], 'openapi.ts');
-const enumLookup = {};
 
-let typeFile;
+let ast;
 try {
-  typeFile = await openapiTS(openAPISchema, { transform });
+  ast = await openapiTS(openAPISchema, { enum: true, defaultNonNullable: false});
 } catch (e) {
   console.log(e);
   process.exit(0);
 }
-// Add enum definitions to the generated types file.
-const enumDefs = Object.values(enumLookup).map((enumSchema) => formatEnum(enumSchema)).join('\n');
-typeFile += '\n' + enumDefs + '\n';
-
+const typeFile = astToString(ast);
 fs.writeFileSync(openAPIGeneratedPath, typeFile);
-const reExporterFile = generateReExporterFile(typeFile, args['types-dir'], enumLookup);
+const enumNames = new Set(ast.filter((node) => node.kind === ts.SyntaxKind.EnumDeclaration).map((node) => node.name.escapedText));
+const reExporterFile = generateReExporterFile(typeFile, args['types-dir'], enumNames);
 const schemasPath = path.join(args['project-root'], args['types-dir'], 'schemas.ts');
 fs.writeFileSync(schemasPath, reExporterFile);
 if (args['auto-add']) {
