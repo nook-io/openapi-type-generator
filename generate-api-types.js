@@ -8,10 +8,6 @@ import parser from '@typescript-eslint/parser';
 import openapiTS, { astToString } from 'openapi-typescript';
 import ts from "typescript";
 
-function isOptionToken(token) {
-  return token.kind === 'option';
-}
-
 function getArgs() {
   const { values: args, tokens } = parseArgs({
     options: {
@@ -62,6 +58,17 @@ function getArgs() {
     tokens: true
   });
 
+  const commands = [args['oas-url'], args['oas-path'], args['oas-command']].filter(Boolean);
+  if (commands.length > 1) {
+    console.log('Must provide only one of --oas-url, --oas-path or --oas-command');
+    process.exit(0);
+  }
+  if (commands.length === 0) {
+    console.log('Must provide either --oas-url, --oas-path or --oas-command');
+    process.exit(0);
+  }
+
+  
   if (!args['oas-url'] && !args['oas-path'] && !args['oas-command']) {
     console.log('Must provide either --oas-url, --oas-path or --oas-command');
     process.exit(0);
@@ -72,53 +79,44 @@ function getArgs() {
     process.exit(0);
   }
 
-  const importOrder = tokens
-    .filter(isOptionToken)
-    .filter(token => token.name.startsWith('oas'))
-    .sort((a, b) => a.index - b.index)
-    .map(token => token.name);
   args['timeout'] = Number(args['timeout']);
-  return { args, importOrder };
+  return args;
 }
 
 /**
  * Load the OpenAPI schema from the given source.
  */
-async function loadOpenAPISchema(args, importOrder) {
+async function loadOpenAPISchema(args) {
   let openAPIFile;
-  for (const importKey of importOrder) {
-    try {
-      switch (importKey) {
-        case 'oas-path':
-          openAPIFile = fs.readFileSync(args['oas-path']);
-          return JSON.parse(openAPIFile);
-        case 'oas-command': {
-          const options = {};
-          if (args['command-cwd']) {
-            options.cwd = args['command-cwd'];
-          }
-          openAPIFile = execSync(args['oas-command'], options);
-          return JSON.parse(openAPIFile);
-        }
-        case 'oas-url': {
-          const controller = new AbortController()
-          const timeout = setTimeout(() => {
-            controller.abort()
-          }, args['timeout'])
-          let response;
-          response = await fetch(args['oas-url'], { signal: controller.signal });
-          clearTimeout(timeout)
-          return await response.json();
-        }
+  try {
+    if (args['oas-path']) {
+      openAPIFile = fs.readFileSync(args['oas-path']);
+      return JSON.parse(openAPIFile);
+    }
+    if (args['oas-command']) {
+      const options = {};
+      if (args['command-cwd']) {
+        options.cwd = args['command-cwd'];
       }
+      openAPIFile = execSync(args['oas-command'], options);
+      return JSON.parse(openAPIFile);
     }
-    catch (e) {
-      console.log(`Could not load OpenAPI file using ${importKey}: ${e}`);
-      continue;
+    if (args['oas-url']) {
+      const controller = new AbortController()
+      const timeout = setTimeout(() => {
+        controller.abort()
+      }, args['timeout'])
+      let response;
+      response = await fetch(args['oas-url'], { signal: controller.signal });
+      clearTimeout(timeout)
+      return await response.json();
     }
+    throw new Error('Could not determine how to load the OpenAPI file');
   }
-  console.log('Could not load OpenAPI file');
-  process.exit(0)
+  catch (e) {
+    console.error('Could not load OpenAPI file');
+    throw e;
+  }
 }
 
 
@@ -158,8 +156,8 @@ function generateReExporterFile(typeFile, typesDir, enumNames) {
   return reExporterLines.join('\n');
 }
 
-const { args, importOrder } = getArgs();
-const openAPISchema = await loadOpenAPISchema(args, importOrder);
+const args = getArgs();
+const openAPISchema = await loadOpenAPISchema(args);
 const openAPIGeneratedPath = path.join(args['project-root'], args['types-dir'], 'openapi.ts');
 
 let ast;
