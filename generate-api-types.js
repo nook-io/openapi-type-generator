@@ -67,7 +67,6 @@ function getArgs() {
     console.log('Must provide either --oas-url, --oas-path or --oas-command');
     process.exit(0);
   }
-
   
   if (!args['oas-url'] && !args['oas-path'] && !args['oas-command']) {
     console.log('Must provide either --oas-url, --oas-path or --oas-command');
@@ -99,9 +98,23 @@ async function loadOpenAPISchema(args) {
         options.cwd = args['command-cwd'];
       }
       openAPIFile = execSync(args['oas-command'], options);
-      return JSON.parse(openAPIFile);
+      if (openAPIFile.length == 0) {
+        console.error('The command to generate the OpenAPI file returned an empty response. This suggests there is an error in the command.');
+        process.exit(0);
+      }
+      try {
+        return JSON.parse(openAPIFile);
+      } catch (e) {
+        console.error(
+          'The command to generate the OpenAPI file returned an invalid JSON response. This suggests there is an ' +
+          'error in the command. A common issue is that text was output to stdout instead of or in addition toJSON.'
+        );
+        console.error(`The returned OpenAPI schema was: ${openAPIFile}`);
+        process.exit(0);
+      }
     }
     if (args['oas-url']) {
+
       const controller = new AbortController()
       const timeout = setTimeout(() => {
         controller.abort()
@@ -109,8 +122,30 @@ async function loadOpenAPISchema(args) {
       let response;
       response = await fetch(args['oas-url'], { signal: controller.signal });
       clearTimeout(timeout)
-      return await response.json();
+      if (!response.ok) {
+        console.error(`The OpenAPI URL returned an error: [${response.status}] ${response.statusText}`);
+        process.exit(0);
+      }
+      try {
+        response = await response.json();
+        return response;
+      } catch (e) {
+        try {
+          body = await response.text();
+        } catch (e) {
+          console.error('The response from the OpenAPI URL could not be interpreted as text. Is it just empty?');
+          process.exit(0);
+        }
+        if (body.length == 0) {
+          console.error('The response from the OpenAPI URL is empty');
+          process.exit(0);
+        }
+        console.error('The response from the OpenAPI URL is not valid JSON');
+        process.exit(0);
+      }
+
     }
+    console.log(args);
     throw new Error('Could not determine how to load the OpenAPI file');
   }
   catch (e) {
@@ -164,7 +199,8 @@ let ast;
 try {
   ast = await openapiTS(openAPISchema, { enum: true, defaultNonNullable: false});
 } catch (e) {
-  console.log(e);
+  console.error(e);
+  console.error(`The returned OpenAPI schema was: ${JSON.stringify(openAPISchema)}`);
   process.exit(0);
 }
 const typeFile = astToString(ast);
