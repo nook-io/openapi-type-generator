@@ -93,7 +93,7 @@ async function loadOpenAPISchema(args) {
       return JSON.parse(openAPIFile);
     }
     if (args['oas-command']) {
-      const options = {};
+      const options = {maxBuffer: 1024 * 1024 * 100};
       if (args['command-cwd']) {
         options.cwd = args['command-cwd'];
       }
